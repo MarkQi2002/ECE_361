@@ -56,6 +56,10 @@ int main(int argc, char* argv[]) {
     // Free Allocated Memory
     free(filename);
 
+    // Start Time
+    struct timespec start_time;
+    clock_gettime(CLOCK_REALTIME, &start_time);
+
     // Sending Message
     int number_bytes;
     if ((number_bytes = sendto(socketFD, "ftp", strlen("ftp"), 0, (struct sockaddr *) &server_addr, sizeof(server_addr))) == -1) {
@@ -70,6 +74,12 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Recvfrom Error\n");
         exit(1);
     }
+
+    // End Time
+    struct timespec end_time;
+    clock_gettime(CLOCK_REALTIME, &end_time);
+    double elapsed_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+    fprintf(stdout, "Elapsed Time: %f Seconds\n", elapsed_time);
 
     // File Transfer Can Start
     if (strcmp(buffer, "yes") == 0) {
