@@ -19,6 +19,7 @@
 #include <netdb.h>
 #include <time.h>
 
+#define MAX_MESSAGE_LENGTH 2052
 #define MAX_PACKET_SIZE 1000
 #define BUFFER_SIZE 1024
 

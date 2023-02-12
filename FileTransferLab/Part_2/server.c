@@ -5,96 +5,87 @@
 void messageToPacket(char * message, packet * packet);
 
 // Function To Convert Message To Packet
-void messageToPacket(char* buffer, struct packet* packet) {
-    //printf("%s\n", buffer);
+void messageToPacket(char * message, packet * packet) {
+    // Variable Declaration
     int colon_one, colon_two, colon_three, colon_four;
 
-    // find total_frag
-    for (int i = 0; i < BUFFER_SIZE; i++){
-        if (buffer[i] == ':'){
+    // Find Total Frag
+    for (int i = 0; i < MAX_MESSAGE_LENGTH; i++){
+        if (message[i] == ':'){
             colon_one = i;
             break;
         }
     }
 
+    // Copy Total Frag
     char total_frag_str[colon_one + 1];
     for (int i = 0; i < colon_one; i++){
-        total_frag_str[i] = buffer[i];
+        total_frag_str[i] = message[i];
     }
     total_frag_str[colon_one] = '\0';
-    packet->total_frag = atoi(total_frag_str);
+    packet -> total_frag = atoi(total_frag_str);
 
-    // find frag_no
-    for (int i = colon_one + 1; i < BUFFER_SIZE; i++){
-        if (buffer[i] == ':'){
+    // Find Frag Number
+    for (int i = colon_one + 1; i < MAX_MESSAGE_LENGTH; i++){
+        if (message[i] == ':'){
             colon_two = i;
             break;
         }
     }
 
+    // Copy Frag Number
     char frag_no_str[colon_two - colon_one];
     for (int i = 0; i < colon_two - colon_one - 1; i++){
-        frag_no_str[i] = buffer[colon_one + 1 + i];
+        frag_no_str[i] = message[colon_one + 1 + i];
     }
     frag_no_str[colon_two - colon_one - 1] = '\0';
-    packet->frag_no = atoi(frag_no_str);
+    packet -> frag_no = atoi(frag_no_str);
 
-    // find file size
-    for (int i = colon_two + 1; i < BUFFER_SIZE; i++){
-        if (buffer[i] == ':'){
+    // Find File Size
+    for (int i = colon_two + 1; i < MAX_MESSAGE_LENGTH; i++){
+        if (message[i] == ':'){
             colon_three = i;
             break;
         }
     }
 
+    // Copy File Size
     char size_str[colon_three - colon_two];
     for (int i = 0; i < colon_three - colon_two - 1; i++){
-        size_str[i] = buffer[colon_two + 1 + i];
+        size_str[i] = message[colon_two + 1 + i];
     }
     size_str[colon_three - colon_two - 1] = '\0';
-    packet->size = atoi(size_str);
+    packet -> size = atoi(size_str);
 
-    // find filename
-    for (int i = colon_three + 1; i < BUFFER_SIZE; i++){
-        if (buffer[i] == ':'){
+    // Find File Name
+    for (int i = colon_three + 1; i < MAX_MESSAGE_LENGTH; i++){
+        if (message[i] == ':'){
             colon_four = i;
             break;
         }
     }
 
-    packet->filename = (char *)malloc(sizeof(colon_four - colon_three));
+    // Copy File Name
+    packet -> filename = (char *) malloc(sizeof(colon_four - colon_three));
     for (int i = 0; i < colon_four - colon_three - 1; i++){
-        packet->filename[i] = buffer[colon_three + 1 + i];
+        packet -> filename[i] = message[colon_three + 1 + i];
     }
-    packet->filename[colon_four - colon_three - 1] = '\0';
+    packet -> filename[colon_four - colon_three - 1] = '\0';
 
-    // find filedata
-    for (int i = 0; i < packet->size; i++){
-        packet->filedata[i] = buffer[colon_four + 1 + i];
+    // Copy File Data
+    for (int i = 0; i < packet -> size; i++){
+        packet -> filedata[i] = message[colon_four + 1 + i];
     }
+
+    // TESTING
+    // fprintf(stdout, "Message: %s\n", message);
+    // fprintf(stdout, "Total Frag: %d\n", packet -> total_frag);
+    // fprintf(stdout, "Frag No: %d\n", packet -> frag_no);
+    // fprintf(stdout, "Size: %d\n", packet -> size);
+    // fprintf(stdout, "Filename: %s\n", packet -> filename);
+    // fprintf(stdout, "Filedata: %s\n", packet -> filedata);
     
 }
-
-// void messageToPacket(char * message, packet * packet) {
-//     char * token = strtok(message, ":");
-//     packet -> total_frag = atoi(token);
-//     token = strtok(message, ":");
-//     packet -> frag_no = atoi(token);
-//     token = strtok(message, ":");
-//     packet -> size = atoi(token);
-//     token = strtok(message, ":");
-//     packet -> filename = (char *) malloc(sizeof(char) * sizeof(token));
-//     strcpy(packet -> filename, token);
-//     token = strtok(message, ":");
-//     memcpy(token, packet -> filedata, sizeof(char) * sizeof(token));
-
-//     fprintf(stdout, "Message: %s\n", message);
-//     fprintf(stdout, "Total Frag: %d\n", packet -> total_frag);
-//     fprintf(stdout, "Frag No: %d\n", packet -> frag_no);
-//     fprintf(stdout, "Size: %d\n", packet -> size);
-//     fprintf(stdout, "Filename: %s\n", packet -> filename);
-//     fprintf(stdout, "Filedata: %s\n", packet -> filedata);
-// }
 
 // Main Function
 int main(int argc, char * argv[]) {
@@ -156,11 +147,11 @@ int main(int argc, char * argv[]) {
     // Receiving File
     int complete_file_transfer = 0;
     int save_fd = -1;
-    int maximum_message_length = 10 + 10 + 4 + BUFFER_SIZE + MAX_PACKET_SIZE + 4;
-    char * file_buffer = (char *) malloc(sizeof(char) * maximum_message_length);
+    char * file_buffer = (char *) malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
+    FILE * fp = NULL;
     while (complete_file_transfer == 0) {
-        memset(file_buffer, 0, maximum_message_length);
-        if (recvfrom(socketFD, file_buffer, maximum_message_length, 0, (struct sockaddr *) &client_addr, &client_addr_length) == -1) {
+        memset(file_buffer, 0, MAX_MESSAGE_LENGTH);
+        if (recvfrom(socketFD, file_buffer, MAX_MESSAGE_LENGTH, 0, (struct sockaddr *) &client_addr, &client_addr_length) == -1) {
             fprintf(stderr, "Recvfrom Error\n");
             exit(1);
         }
@@ -169,21 +160,22 @@ int main(int argc, char * argv[]) {
         packet receiving_packet;
         messageToPacket(file_buffer, &receiving_packet);
 
-        // Creating File Descriptor
-        if (save_fd == -1) {
+        // Write To File
+        // fprintf(stdout, "Writing %s\n", receiving_packet.filedata);
+        if (fp == NULL) {
             char receive_file_path[BUFFER_SIZE] = "Receive/";
             strcat(receive_file_path, receiving_packet.filename);
-            printf("File Name : %s\n", receive_file_path);
-            if (((save_fd = creat(receive_file_path, 0777)) < 0)) {
-                fprintf(stderr, "Error Creating File Descriptor\n");
+            fp = fopen(receive_file_path, "w+");
+            if (fp == NULL) {
+                perror("Server: cannot create the target file");
                 exit(1);
             }
         }
-
+        
         // Write To File
-        fprintf(stdout, "Writing %s\n", receiving_packet.filedata);
-        if (write(save_fd, receiving_packet.filedata, receiving_packet.size) < 0) {
-            fprintf(stderr, "Error Saving File To save_fd %d\n", save_fd);
+        int byte_wrote = fwrite(receiving_packet.filedata, sizeof(char), receiving_packet.size, fp);
+        if (byte_wrote != receiving_packet.size) {
+            printf("fwrite error.\n");
             exit(1);
         }
 
@@ -197,18 +189,20 @@ int main(int argc, char * argv[]) {
         if (receiving_packet.frag_no == receiving_packet.total_frag) {
             complete_file_transfer = 1;
         }
+
+        // Free Packet
+        free(receiving_packet.filename);
     }
 
     // Close Socket
     close(socketFD);
-    
-    // Close File Descriptor
-    if (close(save_fd) < 0) {
-        fprintf(stderr, "Error Closing save_fd\n");
-    }
+
+    // Close File
+    fclose(fp);
 
     // Free Allocated Memory
     free(buffer);
+    free(file_buffer);
 
     // Successfully Executed
     return 0;

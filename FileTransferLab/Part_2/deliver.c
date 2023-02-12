@@ -33,8 +33,6 @@ void packetToMessage(packet * packet, char * message) {
     ++index;
 
     memcpy(message + index, packet -> filedata, sizeof(char) * packet -> size);
-    printf("%s\n", message);
-
 }
 
 // Main Function
@@ -118,23 +116,19 @@ int main(int argc, char* argv[]) {
         fprintf(stdout, "A file transfer can start.\n");
     }
 
-    // Extract File Stat
-    struct stat file_stat;
-    if (stat(filename, &file_stat) < 0) {
-        fprintf(stderr, "Error Extracting File Stat for %s\n", filename);
+    
+    // Open File
+    FILE * fp;
+    if ((fp = fopen(filename, "r")) == NULL) {
+        perror("Deliver: cannot open the target file");
         exit(1);
     }
 
-    int total_frag = file_stat.st_size / MAX_PACKET_SIZE;
-    if (file_stat.st_size % MAX_PACKET_SIZE != 0) ++total_frag; 
-    fprintf(stdout, "Total Number of Packets: %d\n", total_frag);
-
-    // File Descriptor
-    int file_fd = 0, flags = 0;
-    if ((file_fd = open(filename, flags)) < 0) {
-        fprintf(stderr, "Error Opening File %s\n", filename);
-        exit(1);
-    }
+    // Calculate total number of packets required
+    fseek(fp, 0, SEEK_END);
+    long int total_len = ftell(fp);
+    int total_frag = total_len / 1000 + 1;
+    fseek(fp, 0, SEEK_SET); 
 
     // Transfer File
     packet * packet_list = (packet *) malloc(sizeof(packet) * total_frag);
@@ -143,26 +137,16 @@ int main(int argc, char* argv[]) {
     int frag_no = 1;
 
     // Extracting File Until Empty
-    while (ret != 0) {
-        if ((ret = read(file_fd, packet_list[frag_no - 1].filedata, MAX_PACKET_SIZE)) < 0) {
-            fprintf(stderr, "Error Reading File %s\n", filename);
-            exit(1);
-        }
-
-        // Empty Buffer
-        if (ret == 0) break;
-
+    for (int i = 0; i < total_frag; ++i) {
         // Organize Packet
         packet_list[frag_no - 1].total_frag = total_frag;
         packet_list[frag_no - 1].frag_no = frag_no;
-        packet_list[frag_no - 1].size = ret;
-        packet_list[frag_no - 1].filename = (char *) malloc(sizeof(char) * BUFFER_SIZE);
-        strcpy(packet_list[frag_no - 1].filename, filename);
+        packet_list[frag_no - 1].size = (int) fread(packet_list[frag_no - 1].filedata, sizeof(char), 1000, fp);
+        packet_list[frag_no - 1].filename = filename;
         
         // Initialize Message String
-        int maximum_message_length = 10 + 10 + 4 + BUFFER_SIZE + MAX_PACKET_SIZE + 4;
-        message_list[frag_no - 1] = (char *) malloc(sizeof(char) * maximum_message_length);
-        memset(message_list[frag_no - 1], 0, sizeof(char) * maximum_message_length);
+        message_list[frag_no - 1] = (char *) malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
+        memset(message_list[frag_no - 1], 0, sizeof(char) * MAX_MESSAGE_LENGTH);
 
         // Convert Packet To Message
         packetToMessage(&packet_list[frag_no - 1], message_list[frag_no - 1]);
@@ -176,10 +160,11 @@ int main(int argc, char* argv[]) {
 
     // Sending File
     for (int i = 0; i < total_frag; ++i) {
+        // TESTING
         // fprintf(stdout, "Message Number %d: %s\n", i, message_list[i]);
 
         // Sending Message
-        if ((number_bytes = sendto(socketFD, message_list[i], strlen(message_list[i]), 0, (struct sockaddr *) &server_addr, sizeof(server_addr))) == -1) {
+        if ((number_bytes = sendto(socketFD, message_list[i], MAX_MESSAGE_LENGTH, 0, (struct sockaddr *) &server_addr, sizeof(server_addr))) == -1) {
             fprintf(stderr, "Sendto Error\n");
             exit(1);
         } else {
@@ -202,10 +187,18 @@ int main(int argc, char* argv[]) {
 
     // Close Socket
     close(socketFD);
+    
+    // Close File
+    fclose(fp);
 
     // Free Allocated Memory
     free(buffer);
     free(filename);
+    free(packet_list);
+    for (int i = 0; i < total_frag; ++i) {
+        free(message_list[i]);
+    }
+    free(message_list);
 
     // Successfully Executed
     return 0;
