@@ -158,7 +158,8 @@ int main(int argc, char * argv[]) {
         }
 
         // Randomly Dropping Packets
-        if (uniform_rand() < 0.8) {
+        // 10 Percent Possibility Of Lost Packet
+        if (uniform_rand() < 1e-1) {
             continue;
         }
         // Receiving Packet
