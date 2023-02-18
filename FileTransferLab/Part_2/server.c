@@ -76,15 +76,6 @@ void messageToPacket(char * message, packet * packet) {
     for (int i = 0; i < packet -> size; i++){
         packet -> filedata[i] = message[colon_four + 1 + i];
     }
-
-    // TESTING
-    // fprintf(stdout, "Message: %s\n", message);
-    // fprintf(stdout, "Total Frag: %d\n", packet -> total_frag);
-    // fprintf(stdout, "Frag No: %d\n", packet -> frag_no);
-    // fprintf(stdout, "Size: %d\n", packet -> size);
-    // fprintf(stdout, "Filename: %s\n", packet -> filename);
-    // fprintf(stdout, "Filedata: %s\n", packet -> filedata);
-    
 }
 
 // Main Function
@@ -148,6 +139,7 @@ int main(int argc, char * argv[]) {
     int complete_file_transfer = 0;
     int save_fd = -1;
     char * file_buffer = (char *) malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
+    char receive_file_path[BUFFER_SIZE] = "Receive/";
     FILE * fp = NULL;
     while (complete_file_transfer == 0) {
         memset(file_buffer, 0, MAX_MESSAGE_LENGTH);
@@ -161,10 +153,11 @@ int main(int argc, char * argv[]) {
         messageToPacket(file_buffer, &receiving_packet);
 
         // Write To File
-        // fprintf(stdout, "Writing %s\n", receiving_packet.filedata);
         if (fp == NULL) {
-            char receive_file_path[BUFFER_SIZE] = "Receive/";
+            // Direct To Receive Directory
             strcat(receive_file_path, receiving_packet.filename);
+
+            // Open File To Write To
             fp = fopen(receive_file_path, "w+");
             if (fp == NULL) {
                 perror("Server: cannot create the target file");
@@ -193,6 +186,9 @@ int main(int argc, char * argv[]) {
         // Free Packet
         free(receiving_packet.filename);
     }
+
+    // Indicate File Received Successfully
+    fprintf(stdout, "File %s Received Successfully\nTerminating Program...\n", receive_file_path);
 
     // Close Socket
     close(socketFD);

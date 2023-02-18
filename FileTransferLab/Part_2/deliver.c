@@ -10,25 +10,21 @@ void packetToMessage(packet * packet, char * message) {
     int index = 0;
     sprintf(message, "%d", packet -> total_frag);
     index = strlen(message);
-    // fprintf(stdout, "Current Index: %d\n", index);
     sprintf(message + index, "%c", ':');
     ++index;
 
     sprintf(message + index, "%d", packet -> frag_no);
     index = strlen(message);
-    // fprintf(stdout, "Current Index: %d\n", index);
     sprintf(message + index, "%c", ':');
     ++index;
 
     sprintf(message + index, "%d", packet -> size);
     index = strlen(message);
-    // fprintf(stdout, "Current Index: %d\n", index);
     sprintf(message + index, "%c", ':');
     ++index;
 
     sprintf(message + index, "%s", packet -> filename);
     index += strlen(packet -> filename);
-    // fprintf(stdout, "Current Index: %d\n", index);
     sprintf(message + index, "%c", ':');
     ++index;
 
@@ -115,7 +111,6 @@ int main(int argc, char* argv[]) {
     if (strcmp(buffer, "yes") == 0) {
         fprintf(stdout, "A file transfer can start.\n");
     }
-
     
     // Open File
     FILE * fp;
@@ -151,24 +146,16 @@ int main(int argc, char* argv[]) {
         // Convert Packet To Message
         packetToMessage(&packet_list[frag_no - 1], message_list[frag_no - 1]);
 
-        // TESTING
-        // fprintf(stdout, "Message Number %d: %s\n", frag_no - 1, message_list[frag_no - 1]);
-
         // Increment Frag Number
         ++frag_no;
     }
 
     // Sending File
     for (int i = 0; i < total_frag; ++i) {
-        // TESTING
-        // fprintf(stdout, "Message Number %d: %s\n", i, message_list[i]);
-
         // Sending Message
         if ((number_bytes = sendto(socketFD, message_list[i], MAX_MESSAGE_LENGTH, 0, (struct sockaddr *) &server_addr, sizeof(server_addr))) == -1) {
             fprintf(stderr, "Sendto Error\n");
             exit(1);
-        } else {
-            // fprintf(stdout, "Sent Packet Segment Number %i\n", i);
         }
 
         // Recvfrom
@@ -184,6 +171,9 @@ int main(int argc, char* argv[]) {
             --i;
         }
     }
+
+    // Indicate File Sent Successfully
+    fprintf(stdout, "File %s Sent Successfully\nTerminating Program...\n", filename);
 
     // Close Socket
     close(socketFD);
