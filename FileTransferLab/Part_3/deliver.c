@@ -104,8 +104,8 @@ int main(int argc, char* argv[]) {
     // End Time
     struct timespec end_time;
     clock_gettime(CLOCK_REALTIME, &end_time);
-    double elapsed_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
-    fprintf(stdout, "Elapsed Time: %f Seconds\n", elapsed_time);
+    double initial_RTT = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+    fprintf(stdout, "Elapsed Time: %f Seconds\n", initial_RTT);
 
     // File Transfer Can Start
     if (strcmp(buffer, "yes") == 0) {
@@ -150,8 +150,29 @@ int main(int argc, char* argv[]) {
         ++frag_no;
     }
 
+    // Timer Variables
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+
+    if (setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, (void *) &timeout, sizeof(timeout)) < 0) {
+        fprintf(stderr, "Set Socket Option Error\n");
+        exit(1);
+    }
+
+    double estimated_RTT = initial_RTT;
+    double deviation_RTT = 0;
+    clock_t start_time_RTT = 0;
+    clock_t end_time_RTT = 0;
+    double measured_RTT = 0;
+    double timeout_interval = 0;
+    int time_sent = 0;
+
     // Sending File
     for (int i = 0; i < total_frag; ++i) {
+        // Timer
+        start_time_RTT = clock();
+
         // Sending Message
         if ((number_bytes = sendto(socketFD, message_list[i], MAX_MESSAGE_LENGTH, 0, (struct sockaddr *) &server_addr, sizeof(server_addr))) == -1) {
             fprintf(stderr, "Sendto Error\n");
@@ -163,13 +184,27 @@ int main(int argc, char* argv[]) {
         socklen_t server_addr_length;
         if (recvfrom(socketFD, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &server_addr, &server_addr_length) == -1) {
             fprintf(stderr, "Recvfrom Error\n");
-            exit(1);
+            --i;
+        // Acknowledgement Received
+        } else if (strcmp(buffer, "ACK") != 0) {
+            --i;
+        // Setting RTT Time
+        } else {
+            end_time_RTT = clock();
+            measured_RTT = end_time_RTT - start_time_RTT;
+            estimated_RTT = 0.875 * estimated_RTT + 0.125 * measured_RTT;
+            deviation_RTT = 0.75 * deviation_RTT + 0.25 * (measured_RTT - estimated_RTT);
+            timeout_interval = 20 * estimated_RTT + 4 * deviation_RTT;
+            timeout_interval = timeout_interval / CLOCKS_PER_SEC;
+            timeout.tv_sec = timeout_interval / 1;
+            timeout.tv_usec = (timeout_interval - timeout.tv_sec) * 1000000;
+            if (setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, (void *) &timeout, sizeof(timeout)) < 0) {
+                fprintf(stderr, "Set Socket Option Error\n");
+                exit(1);
+            }
         }
 
-        // File Transfer Can Start
-        if (strcmp(buffer, "ACK") != 0) {
-            --i;
-        }
+
     }
 
     // Indicate File Sent Successfully

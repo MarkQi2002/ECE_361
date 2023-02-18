@@ -3,6 +3,7 @@
 
 // Function Prototype
 void messageToPacket(char * message, packet * packet);
+double uniform_rand();
 
 // Function To Convert Message To Packet
 void messageToPacket(char * message, packet * packet) {
@@ -78,8 +79,16 @@ void messageToPacket(char * message, packet * packet) {
     }
 }
 
+// Uniform Random Number Generator Between Zero And One
+double uniform_rand() {
+    return (double) rand() / (double) RAND_MAX;
+}
+
 // Main Function
 int main(int argc, char * argv[]) {
+    // Randomize Generator
+    srand(time(NULL));
+
     // Input Arguments
     if (argc != 2) {
         fprintf(stdout, "Usage: server <UDP listen port>\n");
@@ -148,6 +157,10 @@ int main(int argc, char * argv[]) {
             exit(1);
         }
 
+        // Randomly Dropping Packets
+        if (uniform_rand() < 0.8) {
+            continue;
+        }
         // Receiving Packet
         packet receiving_packet;
         messageToPacket(file_buffer, &receiving_packet);
