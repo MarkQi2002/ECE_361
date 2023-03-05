@@ -160,6 +160,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    // Timer Variables
     double estimated_RTT = initial_RTT;
     double deviation_RTT = 0;
     clock_t start_time_RTT = 0;
@@ -183,6 +184,7 @@ int main(int argc, char* argv[]) {
         memset(buffer, 0, sizeof(char) * BUFFER_SIZE);
         socklen_t server_addr_length;
         if (recvfrom(socketFD, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &server_addr, &server_addr_length) == -1) {
+            fprintf(stdout, "Client Retransmitting Packet %d\n", i + 1);
             fprintf(stderr, "Recvfrom Error\n");
             --i;
         // Acknowledgement Received
@@ -203,8 +205,6 @@ int main(int argc, char* argv[]) {
                 exit(1);
             }
         }
-
-
     }
 
     // Indicate File Sent Successfully

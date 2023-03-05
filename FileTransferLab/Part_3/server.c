@@ -145,6 +145,7 @@ int main(int argc, char * argv[]) {
     }
 
     // Receiving File
+    int current_packet_number = 0;
     int complete_file_transfer = 0;
     int save_fd = -1;
     char * file_buffer = (char *) malloc(sizeof(char) * MAX_MESSAGE_LENGTH);
@@ -159,7 +160,8 @@ int main(int argc, char * argv[]) {
 
         // Randomly Dropping Packets
         // 10 Percent Possibility Of Lost Packet
-        if (uniform_rand() < 1e-1) {
+        if (uniform_rand() < 0.9) {
+            fprintf(stdout, "Server Dropping Packet %d\n", current_packet_number + 1);
             continue;
         }
         // Receiving Packet
@@ -196,6 +198,9 @@ int main(int argc, char * argv[]) {
         if (receiving_packet.frag_no == receiving_packet.total_frag) {
             complete_file_transfer = 1;
         }
+
+        // Updating Received Packet Number
+        current_packet_number = receiving_packet.frag_no;
 
         // Free Packet
         free(receiving_packet.filename);
