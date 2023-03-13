@@ -102,6 +102,7 @@ void deserialization(char * buffer, struct message * packet) {
     for (int i = 0; i < packet -> size; i++) {
         packet -> data[i] = buffer[colon_three + 1 + i];
     }
+    // packet -> data[packet -> size] = '\0';
 }
 
 // Conditional Compilation

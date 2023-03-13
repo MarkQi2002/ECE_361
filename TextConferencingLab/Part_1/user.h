@@ -271,12 +271,12 @@ Session * leave_session(Session * session_list, int session_ID, const User * use
 // Free Sessions Linked List
 void free_session_list(Session * session_list) {
     Session * current_ptr = session_list;
-    Session * previous_ptr = NULL;
+    Session * next_ptr = NULL;
     while (current_ptr != NULL) {
-        previous_ptr = current_ptr;
         free_user_list(current_ptr -> user);
+        next_ptr = current_ptr -> next;
         free(current_ptr);
-        current_ptr = previous_ptr -> next;
+        current_ptr = next_ptr;
     }
 }
 
