@@ -222,6 +222,7 @@ void logout(int * socketFD_ptr, pthread_t * receive_thread_ptr) {
     // Variable Declaration
     int bytes_sent;
     message message_sent;
+    memset(&message_sent, 0, sizeof(message));
     message_sent.type = 3;
     message_sent.size = 0;
     serialization(&message_sent, buffer);
@@ -269,6 +270,7 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
         // Variable Declaration
         int bytes_sent;
         message message_sent;
+        memset(&message_sent, 0, sizeof(message));
         message_sent.type = 4;
         strncpy(message_sent.data, session_ID, MAX_DATA);
         message_sent.size = strlen(message_sent.data);
@@ -298,6 +300,7 @@ void leave_session(int * socketFD_ptr) {
     // Variable Declaration
     int bytes_sent;
     message message_sent;
+    memset(&message_sent, 0, sizeof(message));
     message_sent.type = 7;
     message_sent.size = 0;
 
@@ -337,6 +340,7 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
         // Variable Declaration
         int bytes_sent;
         message message_sent;
+        memset(&message_sent, 0, sizeof(message));
         message_sent.type = 8;
         strncpy(message_sent.data, session_ID, MAX_DATA);
         message_sent.size = strlen(message_sent.data);
@@ -363,6 +367,7 @@ void list(int * socketFD_ptr) {
     // Variable Declaration
     int bytes_sent;
     message message_sent;
+    memset(&message_sent, 0, sizeof(message));
     message_sent.type = 11;
     message_sent.size = 0;
     
@@ -390,6 +395,7 @@ void send_message(int * socketFD_ptr) {
     // Variable Declaration
     int bytes_sent;
     message message_sent;
+    memset(&message_sent, 0, sizeof(message));
     message_sent.type = 10;
     strncpy(message_sent.data, buffer, MAX_DATA);
     message_sent.size = strlen(message_sent.data);

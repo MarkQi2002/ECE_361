@@ -1,5 +1,21 @@
+/logout
+/joinsession
+/leavesession
+/createsession
+/list
+Hello World
+/login
+/login Bob
+/login Bob 123456
+/login Bob 123456 128.100.13.244
+/login Bob 123456 128.100.13.244 5678
+/login Bob 654321 128.100.13.244 8765
 /login Bob 123456 128.100.13.244 8765
 /joinsession 8765
+/joinsession 5678
 /createsession 8765
+/createsession 5678
 /list
+Hello World!
+I'm Bob
 /quit
