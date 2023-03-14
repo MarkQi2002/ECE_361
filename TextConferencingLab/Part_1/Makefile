@@ -1,6 +1,7 @@
 CC=gcc
 LDFLAGS=-pthread
-all: server
+all: server client
 server: server.o
+client: client.o
 clean:
-	rm -f *.o server
+	rm -f *.o server client

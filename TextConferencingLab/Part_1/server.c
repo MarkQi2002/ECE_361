@@ -17,6 +17,7 @@
 #include "message.h"
 #include "user.h"
 
+// Define Constants
 // Username And Password File
 #define USER_LIST_FILE "user_list.txt"
 // Number Of Pending Connections Queue Will Hold
@@ -94,7 +95,7 @@ void * new_client(void * arg) {
         fprintf(stdout, "Server: Message Received: \"%s\"\n", buffer);
 
         // Converting Message
-        deserialization(buffer, &message_received);
+        if (bytes_received != 0) deserialization(buffer, &message_received);
         memset(&message_sent, 0, sizeof(message));
 
         // Check If Exit Message
