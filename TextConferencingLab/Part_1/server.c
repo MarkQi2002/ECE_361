@@ -32,13 +32,10 @@ int user_connected_count = 0;
 
 // List Of All Sessions Created
 Session * session_list;
-// Session Count Begin From 1
-int session_count = 1;
 
 // Enforce Synchronization
 pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t user_logged_in_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t session_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t user_connected_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Get Sockaddr, IPv4 or IPv6:
@@ -243,18 +240,20 @@ void * new_client(void * arg) {
             pthread_mutex_unlock(&user_logged_in_mutex);
         // Create New Session
         } else if (message_received.type == 8) {
-            fprintf(stdout, "Server: User %s: Trying To Create New Session\n", new_user -> username);
+            // Variable Declaration
+            int session_ID = atoi((char *) message_received.data);
+            fprintf(stdout, "Server: User %s: Trying To Create New Session ID: %d\n", new_user -> username, session_ID);
 
             // Update Global Session List
             serialization(&message_sent, buffer);
             pthread_mutex_lock(&session_list_mutex);
-            session_list = initiate_session(session_list, session_count);
+            session_list = initiate_session(session_list, session_ID);
             pthread_mutex_unlock(&session_list_mutex);
 
             // User Join Created Session
-            session_joined = initiate_session(session_joined, session_count);
+            session_joined = initiate_session(session_joined, session_ID);
             pthread_mutex_lock(&session_list_mutex);
-            session_list = join_session(session_list, session_count, new_user);
+            session_list = join_session(session_list, session_ID, new_user);
             pthread_mutex_unlock(&session_list_mutex);
 
             // Update User Status In User Logged In
@@ -262,7 +261,7 @@ void * new_client(void * arg) {
             for (User * current_user = user_logged_in; current_user != NULL; current_user = current_user -> next) {
                 if (strcmp(current_user -> username, source) == 0) {
                     current_user -> in_session = 1;
-                    current_user -> session_joined = initiate_session(current_user -> session_joined, session_count);
+                    current_user -> session_joined = initiate_session(current_user -> session_joined, session_ID);
                     break;
                 }
             }
@@ -271,14 +270,10 @@ void * new_client(void * arg) {
             // Update Message Sent NS_ACK
             message_sent.type = 9;
             to_send = 1;
-            sprintf((char *) (message_sent.data), "%d", session_count);
+            sprintf((char *) (message_sent.data), "%d", session_ID);
 
-            // Update Session Count
-            pthread_mutex_lock(&session_count_mutex);
-            ++session_count;
-            pthread_mutex_unlock(&session_count_mutex);
-
-            fprintf(stdout, "Server: User %s: Successfully Created Session %d\n", new_user -> username, session_count - 1);
+            // Indicating Session Successfully Created And Joined
+            fprintf(stdout, "Server: User %s: Successfully Created Session %d\n", new_user -> username, session_ID);
         // Usert Send Message
         } else if (message_received.type == 10) {
             fprintf(stdout, "Server: User %s: Sending Message \"%s\"\n", new_user -> username, message_received.data);
