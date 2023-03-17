@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <semaphore.h>
 
 // Custome Header File
 #include "message.h"
@@ -24,6 +25,7 @@ void * get_in_addr(struct sockaddr * sa) {
 
 // Buffer For Sending And Receiving
 char buffer[BUFFER_SIZE];
+char recv_buffer[BUFFER_SIZE];
 
 // User In Session Boolean
 bool in_session = false;
@@ -37,6 +39,15 @@ const char * CREATE_SESSION_COMMAND = "/createsession";
 const char * LIST_COMMAND = "/list";
 const char * QUIT_COMMAND = "/quit";
 
+// Semaphore
+sem_t semaphore_join_session;
+sem_t semaphore_create_session;
+sem_t semaphore_list;
+sem_t semaphore_message;
+
+// User Name
+char my_username[MAX_NAME];
+
 // Receive Subroutine To Handle Receiving Message From Server
 void * receive(void * socketFD_void_ptr) {
     // Receive May Get Types: JN_ACK (5), JN_NAK (6), NS_ACK (9), MESSAGE (10), QU_ACK (12)
@@ -47,11 +58,11 @@ void * receive(void * socketFD_void_ptr) {
     // Receive Loop
     for (;;) {
         // Clear Buffer
-        memset(buffer, 0, BUFFER_SIZE);
+        memset(recv_buffer, 0, BUFFER_SIZE);
         memset(&message_received, 0, sizeof(message));
 
         // Receiving Message From Socket
-        if ((bytes_received = recv(*socketFD_ptr, buffer, BUFFER_SIZE - 1, 0)) == -1) {
+        if ((bytes_received = recv(*socketFD_ptr, recv_buffer, BUFFER_SIZE - 1, 0)) == -1) {
             fprintf(stderr, "Client: recv Error\n");
             return NULL;
         }
@@ -60,27 +71,34 @@ void * receive(void * socketFD_void_ptr) {
         if (bytes_received == 0) continue;
         
         // Set Null Terminator To Buffer
-        buffer[bytes_received] = 0;
+        recv_buffer[bytes_received] = 0;
 
         // Convert String Message To Message
-        deserialization(buffer, &message_received);
+        deserialization(recv_buffer, &message_received);
 
         // Print Received Message
-        fprintf(stdout, "Received Message: \"%s\"\n", buffer);
+        fprintf(stdout, "Received Message: \"%s\"\n", recv_buffer);
 
         // Check Message Type
         if (message_received.type == 5) {
             fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
             in_session = true;
+            sem_post(&semaphore_join_session);
         } else if (message_received.type == 6) {
             fprintf(stdout, "Client: Join Session Failed. Detail: %s\n", message_received.data);
+            sem_post(&semaphore_join_session);
         } else if (message_received.type == 9) {
             fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
             in_session = true;
+            sem_post(&semaphore_create_session);
         } else if (message_received.type == 12) {
             fprintf(stdout, "User ID\t\tSession IDs\n%s", message_received.data);
+            sem_post(&semaphore_list);
         } else if (message_received.type == 10) {
             fprintf(stdout, "%s: %s\n", message_received.source, message_received.data);
+            if (strcmp(message_received.source, my_username) == 0) {
+                sem_post(&semaphore_message);
+            }
         } else {
             fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
         }
@@ -197,6 +215,7 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
         // Check Message
         if (message_received.type == 1 && pthread_create(receive_thread_ptr, NULL, receive, socketFD_ptr) == 0) {
             fprintf(stdout, "Client: Login Successfully\n");
+            strncpy(my_username, message_received.source, MAX_NAME);
         } else if (message_received.type == 2) {
             fprintf(stdout, "Client: Login Failed. Detail: %s\n", message_received.data);
             close(* socketFD_ptr);
@@ -286,6 +305,9 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
             fprintf(stderr, "Client: send Error\n");
             return;
         }
+
+        // Synchronization
+        sem_wait(&semaphore_join_session);
     }
 }
 
@@ -356,6 +378,9 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
             fprintf(stderr, "Client: send Error\n");
             return;
         }
+
+        // Synchronization
+        sem_wait(&semaphore_create_session);
     }
 }
 
@@ -382,6 +407,9 @@ void list(int * socketFD_ptr) {
         fprintf(stderr, "Client: send Error\n");
         return;
     }
+
+    // Synchronization
+    sem_wait(&semaphore_list);
 }
 
 // Send Message Subroutine
@@ -411,6 +439,9 @@ void send_message(int * socketFD_ptr) {
         fprintf(stderr, "Client: send Error\n");
         return;
     }
+
+    // Synchronization
+    sem_wait(&semaphore_message);
 }
 
 // Main Function
@@ -421,6 +452,12 @@ int main(int argc, char * argv[]) {
     char * character_ptr;
     pthread_t receive_thread;
     
+    // Initialize Semaphore
+    sem_init(&semaphore_join_session, 0, 0);
+    sem_init(&semaphore_create_session, 0, 0);
+    sem_init(&semaphore_list, 0, 0);
+    sem_init(&semaphore_message, 0, 0);
+
     // Continuously Take Client Command
     for (;;) {
         fgets(buffer, BUFFER_SIZE - 1, stdin);
