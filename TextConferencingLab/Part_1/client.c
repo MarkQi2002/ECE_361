@@ -65,6 +65,9 @@ void * receive(void * socketFD_void_ptr) {
         // Convert String Message To Message
         deserialization(buffer, &message_received);
 
+        // Print Received Message
+        fprintf(stdout, "Received Message: \"%s\"\n", buffer);
+
         // Check Message Type
         if (message_received.type == 5) {
             fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
