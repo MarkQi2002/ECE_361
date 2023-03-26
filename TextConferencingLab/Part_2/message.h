@@ -105,5 +105,74 @@ void deserialization(char * buffer, struct message * packet) {
     // packet -> data[packet -> size] = '\0';
 }
 
+// Deserialization Function (Converting Stacked Message To Multiple Packets)
+int deserialization_multiple(char * buffer, struct message * packet, int start_index) {
+    // See If There Are More Messages
+    bool more_message = false;
+    for (int i = start_index; i < BUFFER_SIZE; i++) {
+        if (buffer[i] == ':') {
+            more_message = true;
+            break;
+        }
+    }
+
+    // If No More Message Return -1
+    if (more_message == false) return -1;
+
+    // Variable Declaration
+    int colon_one, colon_two, colon_three;
+
+    // Find Type
+    for (int i = start_index; i < BUFFER_SIZE; i++) {
+        if (buffer[i] == ':') {
+            colon_one = i;
+            break;
+        }
+    }
+
+    char type_str[colon_one + 1];
+    for (int i = 0; i < colon_one; i++) {
+        type_str[i] = buffer[i];
+    }
+    type_str[colon_one] = '\0';
+    packet -> type = atoi(type_str);
+
+    // Find File Size
+    for (int i = colon_one + 1; i < BUFFER_SIZE; i++) {
+        if (buffer[i] == ':') {
+            colon_two = i;
+            break;
+        }
+    }
+
+    char size_str[colon_two - colon_one];
+    for (int i = 0; i < colon_two - colon_one - 1; i++) {
+        size_str[i] = buffer[colon_one + 1 + i];
+    }
+    size_str[colon_two - colon_one - 1] = '\0';
+    packet -> size = atoi(size_str);
+
+    // Find Source
+    for (int i = colon_two + 1; i < BUFFER_SIZE; i++) {
+        if (buffer[i] == ':') {
+            colon_three = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < colon_three - colon_two - 1; i++) {
+        packet -> source[i] = buffer[colon_two + 1 + i];
+    }
+    packet -> source[colon_three - colon_two - 1] = '\0';
+
+    // Find Filedata
+    for (int i = 0; i < packet -> size; i++) {
+        packet -> data[i] = buffer[colon_three + 1 + i];
+    }
+    
+    // Return Ending Index
+    return colon_three + 1 + packet -> size;
+}
+
 // Conditional Compilation
 #endif

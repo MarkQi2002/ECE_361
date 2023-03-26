@@ -1,3 +1,6 @@
+// Compile Macro
+#define fprintf_message
+
 // Important Library
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -307,8 +310,6 @@ void * new_client(void * arg) {
                     }
                     fprintf(stdout, "Bytes Sent: %d\n", bytes_sent);
                 }
-
-                sleep(0.1);
             }   
 
             to_send = 0;

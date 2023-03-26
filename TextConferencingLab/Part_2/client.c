@@ -1,3 +1,6 @@
+// Compile Macro
+#define fprintf_message
+
 // Important Library
 #include <stdio.h>
 #include <string.h>
@@ -105,77 +108,81 @@ void * receive(void * socketFD_void_ptr) {
 
         // Receiving Empty Message
         if (bytes_received == 0) continue;
-        
-        // for (int i = 0; i < BUFFER_SIZE - 1; i++) {
-        //     printf("%c", recv_buffer[i]);
-        // }
 
         // Set Null Terminator To Buffer
         recv_buffer[bytes_received] = 0;
 
         // Convert String Message To Message
-        deserialization(recv_buffer, &message_received);
+        int index = 0;
 
-        // Print Received Message
-        fprintf(stdout, "Received Message: \"%s\"\n", recv_buffer);
-        
-        // Check Message Type
-        // Join Session Acknowledgement
-        if (message_received.type == 5) {
-            fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
-            in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-            fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
-            session_linked_list_print(in_session_list);
-            in_session = true;
-            sem_post(&semaphore_join_session);
-        // Join Session Negative Acknowledgement
-        } else if (message_received.type == 6) {
-            fprintf(stdout, "Client: Join Session Failed. Detail: %s\n", message_received.data);
-            sem_post(&semaphore_join_session);
-        // New Session Acknowledgement
-        } else if (message_received.type == 9) {
-            fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
-            in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-            fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
-            session_linked_list_print(in_session_list);
-            in_session = true;
-            sem_post(&semaphore_create_session);
-        // List Acknowledgement
-        } else if (message_received.type == 12) {
-            fprintf(stdout, "User ID\t\tSession IDs\n%s", message_received.data);
-            sem_post(&semaphore_list);
-        // Message Acknowledgement
-        } else if (message_received.type == 10) {
-            fprintf(stdout, "%s: %s\n", message_received.source, message_received.data);
+        // Multiple Messages Might Be Stuck In Receiving Buffer, Loop To Extract All Individual Message
+        while ((index = deserialization_multiple(recv_buffer, &message_received, index)) != -1) {
+            // Print Received Message
+            #ifdef fprintf_message
+                fprintf(stdout, "Received Message: \"%s\"\n", recv_buffer);
+            #endif
+            
+            // Check Message Type
+            // Join Session Acknowledgement
+            if (message_received.type == 5) {
+                fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
+                in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
+                fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                session_linked_list_print(in_session_list);
+                in_session = true;
+                sem_post(&semaphore_join_session);
+            // Join Session Negative Acknowledgement
+            } else if (message_received.type == 6) {
+                fprintf(stdout, "Client: Join Session Failed. Detail: %s\n", message_received.data);
+                sem_post(&semaphore_join_session);
+            // New Session Acknowledgement
+            } else if (message_received.type == 9) {
+                fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
+                in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
+                fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                session_linked_list_print(in_session_list);
+                in_session = true;
+                sem_post(&semaphore_create_session);
+            // List Acknowledgement
+            } else if (message_received.type == 12) {
+                fprintf(stdout, "User ID\t\tSession IDs\n%s", message_received.data);
+                sem_post(&semaphore_list);
+            // Message Acknowledgement
+            } else if (message_received.type == 10) {
+                fprintf(stdout, "%s: %s\n", message_received.source, message_received.data);
 
-            // Extract Sender Name
-            char sender_username[MAX_NAME];
-            strncpy(sender_username, message_received.source, strlen(my_username));
-            sender_username[strlen(my_username)] = '\0';
+                // Extract Sender Name
+                char sender_username[MAX_NAME];
+                strncpy(sender_username, message_received.source, strlen(my_username));
+                sender_username[strlen(my_username)] = '\0';
 
-            // Sender Is User Itself
-            if (strcmp(sender_username, my_username) == 0) {
-                // Check Semaphore Value
-                int semaphore_message_value;
-                if (sem_getvalue(&semaphore_message, &semaphore_message_value) != 0) {
-                    fprintf(stderr, "Client: Sem GetValue Error\n");
+                // Sender Is User Itself
+                if (strcmp(sender_username, my_username) == 0) {
+                    // Check Semaphore Value
+                    int semaphore_message_value;
+                    if (sem_getvalue(&semaphore_message, &semaphore_message_value) != 0) {
+                        fprintf(stderr, "Client: Sem GetValue Error\n");
+                    }
+
+                    // Synchronization
+                    if (semaphore_message_value == 0) {
+                        sem_post(&semaphore_message);
+                    }
                 }
-
-                // Synchronization
-                if (semaphore_message_value == 0) {
-                    sem_post(&semaphore_message);
-                }
+            // Private Message Acknowledgement
+            } else if (message_received.type == 14) {
+                fprintf(stdout, "Client: Private Message Failed. Detail: %s\n", message_received.data);
+            // Invalid Message From Server
+            } else {
+                fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
             }
-        // Private Message Acknowledgement
-        } else if (message_received.type == 14) {
-            fprintf(stdout, "Client: Private Message Failed. Detail: %s\n", message_received.data);
-        // Invalid Message From Server
-        } else {
-            fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
-        }
 
-        // Flush Standard Output Stream
-        fflush(stdout);
+            // Flush Standard Output Stream
+            fflush(stdout);
+
+            // Clear Message Received
+            memset(&message_received, 0, sizeof(message));
+        }
     } 
 
     // Finished Executing Receive Function
