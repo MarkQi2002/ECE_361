@@ -2,3 +2,11 @@
 /login Bob 123456 128.100.13.244 8765
 /login Mark 123456 128.100.13.244 8765
 /login Richard 123456 128.100.13.244 8765
+
+/login Mark 123456 128.100.13.244 8765
+/createsession 123
+/joinsession 456
+
+/login Bob 123456 128.100.13.244 8765
+/createsession 456
+/joinsession 123

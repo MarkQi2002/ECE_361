@@ -173,13 +173,7 @@ void * new_client(void * arg) {
                 int cursor = sprintf((char *) (message_sent.data), "%d", session_ID);
                 strcpy((char *) (message_sent.data + cursor), " Session Not Exist");
                 fprintf(stdout, "Server: User %s: Failed To Join Session %d, Reason, Sesson Not Exist\n", new_user -> username, session_ID);
-            // Already Joined Session
-            } else if (in_session(session_list, session_ID, new_user)) {
-                message_sent.type = 6;
-                to_send = 1;
-                int cursor = sprintf((char *) (message_sent.data), "%d", session_ID);
-                strcpy((char *) (message_sent.data + cursor), " Session Already Joined");
-                fprintf(stdout, "Server: User %s: Failed To Join Session %d, Reason, Sesson Already Joined\n", new_user -> username, session_ID);
+            // Already Joined Session (Deleted For Multiple Session)
             // Successfully Joined Session
             } else {
                 message_sent.type = 5;
@@ -274,7 +268,7 @@ void * new_client(void * arg) {
 
             // Indicating Session Successfully Created And Joined
             fprintf(stdout, "Server: User %s: Successfully Created Session %d\n", new_user -> username, session_ID);
-        // Usert Send Message
+        // User Send Message
         } else if (message_received.type == 10) {
             fprintf(stdout, "Server: User %s: Sending Message \"%s\"\n", new_user -> username, message_received.data);
 
@@ -284,19 +278,26 @@ void * new_client(void * arg) {
             // Prepare Message To Be Sent
             memset(&message_sent, 0, sizeof(message));
             message_sent.type = 10;
-            strcpy((char *) (message_sent.source), new_user -> username);
             strcpy((char *) (message_sent.data), (char *) (message_received.data));
             message_sent.size = strlen((char *) (message_sent.data));
 
-            // Use recv Buffer
-            memset(buffer, 0, sizeof(char) * BUFFER_SIZE);
-            serialization(&message_sent, buffer);
-            fprintf(stderr, "Server: Broadcasting Message %s To Sessions\n", buffer);
-
             // Send Through Local Session List
             for (Session * current_session = session_joined; current_session != NULL; current_session = current_session -> next) {
+                // Variable Declaration
                 Session * session_to_send;
                 if ((session_to_send = is_valid_session(session_list, current_session -> session_ID)) == NULL) continue;
+
+                // Format Message
+                char current_username_and_session_ID[MAX_NAME];
+                sprintf(current_username_and_session_ID, "%s From Session ID %d", new_user -> username, current_session -> session_ID);
+                fprintf(stdout, "Server: Current Session ID And Username: \"%s\"\n", current_username_and_session_ID);
+                strcpy((char *) (message_sent.source), current_username_and_session_ID);
+
+                memset(buffer, 0, sizeof(char) * BUFFER_SIZE);
+                serialization(&message_sent, buffer);
+                fprintf(stderr, "Server: Broadcasting Message %s To Sessions\n", buffer);
+
+                // Iterate Through All User In Session
                 for (User * current_user = session_to_send -> user; current_user != NULL; current_user = current_user -> next) {
                     fprintf(stdout, "Server: Sending Message \"%s\" To User %s\n", buffer, current_user -> username);
                     buffer[strlen(buffer)] = '\0';
@@ -304,7 +305,10 @@ void * new_client(void * arg) {
                         fprintf(stderr, "Server: Broadcasting send Error\n");
                         exit(1);
                     }
+                    fprintf(stdout, "Bytes Sent: %d\n", bytes_sent);
                 }
+
+                sleep(0.1);
             }   
 
             to_send = 0;
@@ -325,6 +329,38 @@ void * new_client(void * arg) {
             }
 
             fprintf(stdout, "Server; Query Result: \n%s\n", message_sent.data);
+        // Private Message
+        } else if (message_received.type == 13) {
+            // Variable Declaration
+            bool found_user = false;
+
+            // Prepare Message To Be Sent
+            memset(&message_sent, 0, sizeof(message));
+            message_sent.type = 14;
+            strcpy((char *) (message_sent.source), (char *) (source));
+            strcpy((char *) (message_sent.data), (char *) (message_received.data));
+            message_sent.size = strlen((char *) (message_sent.data));
+
+            memset(buffer, 0, sizeof(char) * BUFFER_SIZE);
+            serialization(&message_sent, buffer);
+
+            // Iterate Through All Users Logged In
+            for (User * current_user = user_logged_in; current_user != NULL; current_user = current_user -> next) {
+                if (strcmp(current_user -> username, message_received.source) == 0) {
+                    found_user = true;
+                    if ((bytes_sent = send(current_user -> socketFD, buffer, strlen(buffer) + 1, 0)) == -1) {
+                        fprintf(stderr, "Server: Broadcasting send Error\n");
+                        exit(1);
+                    }
+                }
+            }
+
+            // Didn't Found User
+            if (found_user == false) {
+                strcpy((char *) (message_sent.data), "Didn't Found User Requested");
+                message_sent.size = strlen((char *) (message_sent.data));
+                to_send = 1;
+            }
         }
 
         // Sending Message To Client
