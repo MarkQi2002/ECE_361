@@ -350,7 +350,7 @@ void * new_client(void * arg) {
                 if (strcmp(current_user -> username, message_received.source) == 0) {
                     found_user = true;
                     if ((bytes_sent = send(current_user -> socketFD, buffer, strlen(buffer) + 1, 0)) == -1) {
-                        fprintf(stderr, "Server: Broadcasting send Error\n");
+                        fprintf(stderr, "Server: Private Message send Error\n");
                         exit(1);
                     }
                 }
@@ -358,7 +358,8 @@ void * new_client(void * arg) {
 
             // Didn't Found User
             if (found_user == false) {
-                strcpy((char *) (message_sent.data), "Didn't Found User Requested");
+                message_sent.type = 15;
+                sprintf((char *) (message_sent.data), "Didn't Found User \"%s\" Requested", message_received.source);
                 message_sent.size = strlen((char *) (message_sent.data));
                 to_send = 1;
             }

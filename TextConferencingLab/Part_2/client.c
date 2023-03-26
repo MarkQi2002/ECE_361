@@ -113,7 +113,7 @@ session_linked_list * in_session_list = NULL;
 
 // Receive Subroutine To Handle Receiving Message From Server
 void * receive(void * socketFD_void_ptr) {
-    // Receive May Get Types: JN_ACK (5), JN_NAK (6), NS_ACK (9), MESSAGE (10), QU_ACK (12)
+    // Receive May Get Types: JN_ACK (5), JN_NAK (6), NS_ACK (9), MESSAGE (10), QU_ACK (12), Private Message (14), Private Message Error (15)
     int * socketFD_ptr = (int *) socketFD_void_ptr;
     int bytes_received;
     message message_received;
@@ -207,8 +207,13 @@ void * receive(void * socketFD_void_ptr) {
                         sem_post(&semaphore_message);
                     }
                 }
-            // Private Message Acknowledgement
+            // Private Message
             } else if (message_received.type == 14) {
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Private Message From %s: %s\n", message_received.source, message_received.data);
+                #endif
+            // Private Message Error
+            } else if (message_received.type == 15) {
                 #ifdef fprintf_server_side_indication_message
                     fprintf(stdout, "Client: Private Message Failed. Detail: %s\n", message_received.data);
                 #endif
