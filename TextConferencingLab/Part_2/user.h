@@ -124,8 +124,8 @@ void free_user_list(User * user_list) {
     User * previous_ptr = NULL;
     while (current_ptr != NULL) {
         previous_ptr = current_ptr;
-        free(current_ptr);
         current_ptr = previous_ptr -> next;
+        free(current_ptr);
     }
 }
 

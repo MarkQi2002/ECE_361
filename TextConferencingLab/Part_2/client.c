@@ -2,12 +2,14 @@
 /// Message For Debug (Optional)
 /// Message For Indicating Error
 /// Message For Client Side Indication (Optional)
+/// Message For Client Session Linked List Message (Optional)
 /// Message For Server Side Indication
-/// Message For Invalid Command Indication (Optional)
+/// Message For Invalid Command Indication
 
-#define fprintf_debug_message
+// #define fprintf_debug_message
 #define fprintf_error_message
-#define fprintf_client_side_indication_message
+// #define fprintf_client_side_indication_message
+#define fprintf_client_session_linked_list_message
 #define fprintf_server_side_indication_message
 #define fprintf_invalid_command_message
 
@@ -73,7 +75,7 @@ void session_linked_list_print(session_linked_list * in_session_list) {
     
     // Iterate Through Entire List
     while (current_ptr != NULL) {
-        #ifdef fprintf_client_side_indication_message
+        #ifdef fprintf_client_session_linked_list_message
             fprintf(stdout, "Client: Session ID Already Joined: %d\n", current_ptr -> session_ID);
         #endif
         previous_ptr = current_ptr;
@@ -92,6 +94,17 @@ session_linked_list * session_linked_list_insert(session_linked_list * in_sessio
     new_session_linked_list -> next = in_session_list;
 
     return new_session_linked_list;
+}
+
+// Free Session Linked List
+void free_session_linked_list(session_linked_list * in_session_list) {
+    session_linked_list * current_ptr = in_session_list;
+    session_linked_list * previous_ptr = NULL;
+    while (current_ptr != NULL) {
+        previous_ptr = current_ptr;
+        current_ptr = previous_ptr -> next;
+        free(previous_ptr);
+    }
 }
 
 // User In Session Boolean
@@ -142,7 +155,7 @@ void * receive(void * socketFD_void_ptr) {
                     fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
                 #endif
                 in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-                #ifdef fprintf_client_side_indication_message
+                #ifdef fprintf_client_session_linked_list_message
                     fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
                 #endif
                 session_linked_list_print(in_session_list);
@@ -160,7 +173,7 @@ void * receive(void * socketFD_void_ptr) {
                     fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
                 #endif
                 in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-                #ifdef fprintf_client_side_indication_message
+                #ifdef fprintf_client_session_linked_list_message
                     fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
                 #endif
                 session_linked_list_print(in_session_list);
@@ -495,6 +508,8 @@ void leave_session(int * socketFD_ptr) {
 
     // User No Longer In Session
     in_session = false;
+    free_session_linked_list(in_session_list);
+    in_session_list = NULL;
 }
 
 // Create Session Subroutine
