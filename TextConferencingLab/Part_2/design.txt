@@ -1,0 +1,21 @@
+Design Specification
+
+We implemented multiple sessions and private messaging functionalities and below are the procedures regarding how we implemented the functionalities.
+
+Functionality 1, Multiple Sessions
+On server side, we implemented linked list structure for recording all sessions a user joined and all users within certain session.
+On client side, we implemented linked list structure for recording all sessions the user joined and indicate user sessions joined everytime a user join or leave session.
+On both side, we removed limitation of a user only capable of joined one single session.
+
+Functionality 2, Private messaging
+We implemented three new types of message.
+Type 13 -> Private Message From Source To Server
+Format /dm "<user to private message to>" "<message to send>"
+
+Type 14 -> Delivering Private Message To Receiver From Server
+Format message.source (Sent By Which User) message.data (Message)
+
+Type 15 -> Delivering Private Message Error To Sender From Server
+Format message.data (Error Detail)
+
+The private messaging functionality is implemented similar to normal message.
