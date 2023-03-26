@@ -1,5 +1,15 @@
 // Compile Macro
-#define fprintf_message
+/// Message For Debug (Optional)
+/// Message For Indicating Error
+/// Message For Client Side Indication (Optional)
+/// Message For Server Side Indication
+/// Message For Invalid Command Indication (Optional)
+
+#define fprintf_debug_message
+#define fprintf_error_message
+#define fprintf_client_side_indication_message
+#define fprintf_server_side_indication_message
+#define fprintf_invalid_command_message
 
 // Important Library
 #include <stdio.h>
@@ -63,8 +73,9 @@ void session_linked_list_print(session_linked_list * in_session_list) {
     
     // Iterate Through Entire List
     while (current_ptr != NULL) {
-        fprintf(stdout, "Session ID Already Joined: %d\n", current_ptr -> session_ID);
-
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: Session ID Already Joined: %d\n", current_ptr -> session_ID);
+        #endif
         previous_ptr = current_ptr;
         current_ptr = current_ptr -> next;
     }
@@ -102,7 +113,9 @@ void * receive(void * socketFD_void_ptr) {
 
         // Receiving Message From Socket
         if ((bytes_received = recv(* socketFD_ptr, recv_buffer, BUFFER_SIZE - 1, 0)) == -1) {
-            fprintf(stderr, "Client: recv Error\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: recv Error\n");
+            #endif
             return NULL;
         }
 
@@ -118,28 +131,38 @@ void * receive(void * socketFD_void_ptr) {
         // Multiple Messages Might Be Stuck In Receiving Buffer, Loop To Extract All Individual Message
         while ((index = deserialization_multiple(recv_buffer, &message_received, index)) != -1) {
             // Print Received Message
-            #ifdef fprintf_message
+            #ifdef fprintf_debug_message
                 fprintf(stdout, "Received Message: \"%s\"\n", recv_buffer);
             #endif
             
             // Check Message Type
             // Join Session Acknowledgement
             if (message_received.type == 5) {
-                fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Client: Successfully Joined Session %s\n", message_received.data);
+                #endif
                 in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-                fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                #ifdef fprintf_client_side_indication_message
+                    fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                #endif
                 session_linked_list_print(in_session_list);
                 in_session = true;
                 sem_post(&semaphore_join_session);
             // Join Session Negative Acknowledgement
             } else if (message_received.type == 6) {
-                fprintf(stdout, "Client: Join Session Failed. Detail: %s\n", message_received.data);
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Client: Join Session Failed. Detail: %s\n", message_received.data);
+                #endif
                 sem_post(&semaphore_join_session);
             // New Session Acknowledgement
             } else if (message_received.type == 9) {
-                fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
+                #endif
                 in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-                fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                #ifdef fprintf_client_side_indication_message
+                    fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                #endif
                 session_linked_list_print(in_session_list);
                 in_session = true;
                 sem_post(&semaphore_create_session);
@@ -161,7 +184,9 @@ void * receive(void * socketFD_void_ptr) {
                     // Check Semaphore Value
                     int semaphore_message_value;
                     if (sem_getvalue(&semaphore_message, &semaphore_message_value) != 0) {
-                        fprintf(stderr, "Client: Sem GetValue Error\n");
+                        #ifdef fprintf_error_message
+                            fprintf(stderr, "Client: Sem GetValue Error\n");
+                        #endif
                     }
 
                     // Synchronization
@@ -171,10 +196,14 @@ void * receive(void * socketFD_void_ptr) {
                 }
             // Private Message Acknowledgement
             } else if (message_received.type == 14) {
-                fprintf(stdout, "Client: Private Message Failed. Detail: %s\n", message_received.data);
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Client: Private Message Failed. Detail: %s\n", message_received.data);
+                #endif
             // Invalid Message From Server
             } else {
-                fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
+                #ifdef fprintf_server_side_indication_message
+                    fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
+                #endif
             }
 
             // Flush Standard Output Stream
@@ -206,10 +235,14 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
     // Input Check
     if (client_username == NULL || client_password == NULL || server_IP == NULL || server_port == NULL) {
-        fprintf(stdout, "Client: Invalid Login Command, Usage: /login <client_username> <client password> <server_ip> <server_port>\n");
+        #ifdef fprintf_invalid_command_message
+            fprintf(stdout, "Client: Invalid Login Command, Usage: /login <client_username> <client password> <server_ip> <server_port>\n");
+        #endif
         return;
     } else if (* socketFD_ptr != INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Can Only Login To 1 Server Simultaneously\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Can Only Login To 1 Server Simultaneously\n");
+        #endif
         return;
     } else {
         // Prepare To Connect Through TCP Protocol
@@ -224,20 +257,26 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Get Server Address Info
         if ((rv = getaddrinfo(server_IP, server_port, &hints, &server_info)) != 0) {
-            fprintf(stderr, "Client: getaddrinfo: %s\n", gai_strerror(rv));
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: getaddrinfo: %s\n", gai_strerror(rv));
+            #endif
             return;
         }
 
         // TCP Handshake
         for (p = server_info; p != NULL; p = p -> ai_next) {
             if ((* socketFD_ptr = socket(p -> ai_family, p -> ai_socktype, p -> ai_protocol)) == -1) {
-                fprintf(stderr, "Client: socket Error\n");
+                #ifdef fprintf_error_message
+                    fprintf(stderr, "Client: socket Error\n");
+                #endif
                 continue;
             }
 
             if (connect(* socketFD_ptr, p -> ai_addr, p -> ai_addrlen) == -1) {
                 close(* socketFD_ptr);
-                fprintf(stderr, "Client: connect Error\n");
+                #ifdef fprintf_error_message
+                    fprintf(stderr, "Client: connect Error\n");
+                #endif
                 continue;
             }
 
@@ -246,7 +285,9 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Failed To Connect
         if (p == NULL) {
-            fprintf(stderr, "Client: Failed To Connect From addrinfo\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: Failed To Connect From addrinfo\n");
+            #endif
             close(* socketFD_ptr);
             * socketFD_ptr = INVALID_SOCKET;
             return;
@@ -254,7 +295,9 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Convert IP Structure
         inet_ntop(p -> ai_family, get_in_addr((struct sockaddr *) p -> ai_addr), s, sizeof(s));
-        fprintf(stdout, "Client: Connecting To %s\n", s);
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: Connecting To %s\n", s);
+        #endif
         freeaddrinfo(server_info);
 
         // Send Login Request
@@ -272,7 +315,9 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Sending Message Through TCP Connection
         if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-            fprintf(stderr, "Client: send Error\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: send Error\n");
+            #endif
             close(* socketFD_ptr);
             * socketFD_ptr = INVALID_SOCKET;
             return;
@@ -280,7 +325,9 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Receiving Server Reply
         if ((bytes_received = recv(* socketFD_ptr, buffer, BUFFER_SIZE - 1, 0)) == -1) {
-            fprintf(stderr, "Client: recv Error\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: recv Error\n");
+            #endif
             close(* socketFD_ptr);
             * socketFD_ptr = INVALID_SOCKET;
             return;
@@ -292,15 +339,21 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
 
         // Check Message
         if (message_received.type == 1 && pthread_create(receive_thread_ptr, NULL, receive, socketFD_ptr) == 0) {
-            fprintf(stdout, "Client: Login Successfully\n");
+            #ifdef fprintf_client_side_indication_message
+                fprintf(stdout, "Client: Login Successfully\n");
+            #endif
             strncpy(my_username, message_received.source, MAX_NAME);
         } else if (message_received.type == 2) {
-            fprintf(stdout, "Client: Login Failed. Detail: %s\n", message_received.data);
+            #ifdef fprintf_client_side_indication_message
+                fprintf(stdout, "Client: Login Failed. Detail: %s\n", message_received.data);
+            #endif
             close(* socketFD_ptr);
             * socketFD_ptr = INVALID_SOCKET;
             return;
         } else {
-            fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
+            #ifdef fprintf_server_side_indication_message
+                fprintf(stdout, "Client: Unexpected Message Received: Type: %d, Source: %d, Data: %s\n", message_received.type, message_received.source, message_received.data);
+            #endif
             close(* socketFD_ptr);
             * socketFD_ptr = INVALID_SOCKET;
             return;
@@ -308,14 +361,18 @@ void login(char * character_ptr, int * socketFD_ptr, pthread_t * receive_thread_
     }
 
     // DEBUGGING USE
-    fprintf(stdout, "Client: Login Function Finished Executing\n");
+    #ifdef fprintf_debug_message
+        fprintf(stdout, "Client: Login Function Finished Executing\n");
+    #endif
 }
 
 // Logout Subroutine
 void logout(int * socketFD_ptr, pthread_t * receive_thread_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     }
 
@@ -330,15 +387,21 @@ void logout(int * socketFD_ptr, pthread_t * receive_thread_ptr) {
 
     // Sending Message To Server
     if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-        fprintf(stderr, "Client: send Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: send Error\n");
+        #endif
         return;
     }
 
     // Close Receive Thread
     if (pthread_cancel(* receive_thread_ptr)) {
-        fprintf(stderr, "Client: pthread_cancel Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: pthread_cancel Error\n");
+        #endif
     } else {
-        fprintf(stdout, "Client: pthread_cancel Successfully\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: pthread_cancel Successfully\n");
+        #endif
     }
 
     // Close Socket
@@ -351,11 +414,15 @@ void logout(int * socketFD_ptr, pthread_t * receive_thread_ptr) {
 void join_session(char * character_ptr, int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     } 
     else if (in_session == true) {
-        fprintf(stdout, "Client: You Have Already Joined A Session\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Already Joined A Session\n");
+        #endif
     }
 
     // Variable Declaration
@@ -365,7 +432,9 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
 
     // Check Session ID
     if (session_ID == NULL) {
-        fprintf(stdout, "Client: Usage: /joinsession <session_id>\n");
+        #ifdef fprintf_invalid_command_message
+            fprintf(stdout, "Client: Usage: /joinsession <session_id>\n");
+        #endif
     } else {
         // Variable Declaration
         int bytes_sent;
@@ -380,7 +449,9 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
 
         // Send Message To Server
         if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-            fprintf(stderr, "Client: send Error\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: send Error\n");
+            #endif
             return;
         }
 
@@ -393,10 +464,14 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
 void leave_session(int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     } else if (in_session == false) {
-        fprintf(stdout, "Client: You Have Not Joined Any Session\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Joined Any Session\n");
+        #endif
         return;
     }
 
@@ -412,7 +487,9 @@ void leave_session(int * socketFD_ptr) {
 
     // Send Message To Server
     if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-        fprintf(stderr, "Client: send Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: send Error\n");
+        #endif
         return;
     }
 
@@ -424,10 +501,14 @@ void leave_session(int * socketFD_ptr) {
 void create_session(char * character_ptr, int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     } else if (in_session == true) {
-        fprintf(stdout, "Client: You Have Already Joined A Session\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Already Joined A Session\n");
+        #endif
         return;
     }
 
@@ -438,7 +519,9 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
 
     // Check Session ID
     if (session_ID == NULL) {
-        fprintf(stdout, "Client: Usage: /createsession <session_id>\n");
+        #ifdef fprintf_invalid_command_message
+            fprintf(stdout, "Client: Usage: /createsession <session_id>\n");
+        #endif
     } else {
         // Variable Declaration
         int bytes_sent;
@@ -453,7 +536,9 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
 
         // Send Message To Server
         if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-            fprintf(stderr, "Client: send Error\n");
+            #ifdef fprintf_error_message
+                fprintf(stderr, "Client: send Error\n");
+            #endif
             return;
         }
 
@@ -466,7 +551,9 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
 void private_message(char * character_ptr, int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     }
 
@@ -478,12 +565,9 @@ void private_message(char * character_ptr, int * socketFD_ptr) {
 
     // Extract Private Message
     character_ptr = strtok(NULL, "\"");
-    fprintf(stdout, "Client: Character Ptr: %s\n", character_ptr);
     strncpy(message_sent.source, character_ptr, MAX_DATA);
     character_ptr = strtok(NULL, "\"");
-    fprintf(stdout, "Client: Character Ptr: %s\n", character_ptr);
     character_ptr = strtok(NULL, "\"");
-    fprintf(stdout, "Client: Character Ptr: %s\n", character_ptr);
     strncpy(message_sent.data, character_ptr, MAX_DATA);
     message_sent.size = strlen(message_sent.data);
 
@@ -492,7 +576,9 @@ void private_message(char * character_ptr, int * socketFD_ptr) {
 
     // Send Message To Server
     if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-        fprintf(stderr, "Client: send Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: send Error\n");
+        #endif
         return;
     }
 }
@@ -501,7 +587,9 @@ void private_message(char * character_ptr, int * socketFD_ptr) {
 void list(int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     }
 
@@ -517,7 +605,9 @@ void list(int * socketFD_ptr) {
 
     // Send Message To Server
     if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-        fprintf(stderr, "Client: send Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: send Error\n");
+        #endif
         return;
     }
 
@@ -529,10 +619,14 @@ void list(int * socketFD_ptr) {
 void send_message(int * socketFD_ptr) {
     // Check If TCP Connection Established
     if (* socketFD_ptr == INVALID_SOCKET) {
-        fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Logged Into Any Server\n");
+        #endif
         return;
     } else if (in_session == false) {
-        fprintf(stdout, "Client: You Have Not Joined A Session Yet\n");
+        #ifdef fprintf_client_side_indication_message
+            fprintf(stdout, "Client: You Have Not Joined A Session Yet\n");
+        #endif
         return;
     }
 
@@ -549,7 +643,9 @@ void send_message(int * socketFD_ptr) {
 
     // Send Message To Server
     if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
-        fprintf(stderr, "Client: send Error\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: send Error\n");
+        #endif
         return;
     }
 
@@ -612,7 +708,9 @@ int main(int argc, char * argv[]) {
         // Private Message Command
         } else if (strcmp(character_ptr, PRIVATE_MESSAGE_COMMAND) == 0) {
             strcpy(buffer, buffer_copy);
-            fprintf(stdout,  "Client: Sending Message \"%s\"\n", buffer);
+            #ifdef fprintf_client_side_indication_message
+                fprintf(stdout,  "Client: Sending Message \"%s\"\n", buffer);
+            #endif
 
             private_message(character_ptr, &socketFD);
         // Quit Command
@@ -621,17 +719,23 @@ int main(int argc, char * argv[]) {
             break;
         // Invalid Command
         } else if (character_ptr[0] == '/') {
-            fprintf(stdout, "Client: Invalid Command \"%s\"\n", character_ptr);
+            #ifdef fprintf_invalid_command_message
+                fprintf(stdout, "Client: Invalid Command \"%s\"\n", character_ptr);
+            #endif
         // Sending Message
         } else {
             strcpy(buffer, buffer_copy);
-            fprintf(stdout,  "Client: Sending Message \"%s\"\n", buffer);
+            #ifdef fprintf_client_side_indication_message
+                fprintf(stdout,  "Client: Sending Message \"%s\"\n", buffer);
+            #endif
             send_message(&socketFD);
         }
     }
 
     // Indicating Quit Successfully
-    fprintf(stdout, "Client: You Have Quit Successfully!\n");
+    #ifdef fprintf_client_side_indication_message
+        fprintf(stdout, "Client: You Have Quit Successfully!\n");
+    #endif
 
     // Successfully Executed Main Function
     return 0;
