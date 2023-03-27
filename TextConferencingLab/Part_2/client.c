@@ -96,6 +96,19 @@ session_linked_list * session_linked_list_insert(session_linked_list * in_sessio
     return new_session_linked_list;
 }
 
+// Check If Session ID Already Joined
+bool session_linked_list_joined(session_linked_list * in_session_list, unsigned int session_ID) {
+    session_linked_list * current_ptr = in_session_list;
+    session_linked_list * previous_ptr = NULL;
+    while (current_ptr != NULL) {
+        if (current_ptr -> session_ID == session_ID) return true;
+        previous_ptr = current_ptr;
+        current_ptr = previous_ptr -> next;
+    }
+
+    return false;
+}
+
 // Free Session Linked List
 void free_session_linked_list(session_linked_list * in_session_list) {
     session_linked_list * current_ptr = in_session_list;
@@ -169,15 +182,21 @@ void * receive(void * socketFD_void_ptr) {
                 sem_post(&semaphore_join_session);
             // New Session Acknowledgement
             } else if (message_received.type == 9) {
-                #ifdef fprintf_server_side_indication_message
-                    fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
-                #endif
-                in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
-                #ifdef fprintf_client_session_linked_list_message
-                    fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
-                #endif
-                session_linked_list_print(in_session_list);
-                in_session = true;
+                if (strcmp(message_received.source, "Session Already Exist") == 0) {
+                    #ifdef fprintf_server_side_indication_message
+                        fprintf(stdout, "Client: Create Session Failed. Detail: Session %d Already Exist\n", atoi(message_received.data));
+                    #endif
+                } else {
+                    #ifdef fprintf_server_side_indication_message
+                        fprintf(stdout, "Client: Successfully Created And Joined Session %s\n", message_received.data);
+                    #endif
+                    in_session_list = session_linked_list_insert(in_session_list, atoi(message_received.data));
+                    #ifdef fprintf_client_session_linked_list_message
+                        fprintf(stdout, "Client: Below Are Sessions You Have Already Joined\n");
+                    #endif
+                    session_linked_list_print(in_session_list);
+                    in_session = true;
+                }
                 sem_post(&semaphore_create_session);
             // List Acknowledgement
             } else if (message_received.type == 12) {
@@ -465,6 +484,12 @@ void join_session(char * character_ptr, int * socketFD_ptr) {
         serialization(&message_sent, buffer);
         buffer[strlen(buffer)] = '\0';
 
+        // Check If Already Joined
+        if (session_linked_list_joined(in_session_list, atoi(message_sent.data)) == true) {
+            fprintf(stdout, "Client: Already Joined Session ID %d\n", atoi(message_sent.data));
+            return;
+        }
+
         // Send Message To Server
         if ((bytes_sent = send(* socketFD_ptr, buffer, strlen(buffer) + 1, 0)) == -1) {
             #ifdef fprintf_error_message
@@ -526,8 +551,8 @@ void create_session(char * character_ptr, int * socketFD_ptr) {
         #endif
         return;
     } else if (in_session == true) {
-        #ifdef fprintf_client_side_indication_message
-            fprintf(stdout, "Client: You Have Already Joined A Session\n");
+        #ifdef fprintf_error_message
+            fprintf(stderr, "Client: You Have Already Joined A Session\n");
         #endif
         return;
     }

@@ -241,36 +241,61 @@ void * new_client(void * arg) {
             int session_ID = atoi((char *) message_received.data);
             fprintf(stdout, "Server: User %s: Trying To Create New Session ID: %d\n", new_user -> username, session_ID);
 
-            // Update Global Session List
-            serialization(&message_sent, buffer);
+            // Check If Session Already Exist
+            bool session_inexist = false;
             pthread_mutex_lock(&session_list_mutex);
-            session_list = initiate_session(session_list, session_ID);
+            if (is_valid_session(session_list, session_ID) == NULL) {
+                session_inexist = true;
+            }
             pthread_mutex_unlock(&session_list_mutex);
 
-            // User Join Created Session
-            session_joined = initiate_session(session_joined, session_ID);
-            pthread_mutex_lock(&session_list_mutex);
-            session_list = join_session(session_list, session_ID, new_user);
-            pthread_mutex_unlock(&session_list_mutex);
+            // If Session Doesn't Exist
+            if (session_inexist == true) {
+                // Update Global Session List
+                serialization(&message_sent, buffer);
+                pthread_mutex_lock(&session_list_mutex);
+                session_list = initiate_session(session_list, session_ID);
+                pthread_mutex_unlock(&session_list_mutex);
 
-            // Update User Status In User Logged In
-            pthread_mutex_lock(&user_logged_in_mutex);
-            for (User * current_user = user_logged_in; current_user != NULL; current_user = current_user -> next) {
-                if (strcmp(current_user -> username, source) == 0) {
-                    current_user -> in_session = 1;
-                    current_user -> session_joined = initiate_session(current_user -> session_joined, session_ID);
-                    break;
+                // User Join Created Session
+                session_joined = initiate_session(session_joined, session_ID);
+                pthread_mutex_lock(&session_list_mutex);
+                session_list = join_session(session_list, session_ID, new_user);
+                pthread_mutex_unlock(&session_list_mutex);
+
+                // Update User Status In User Logged In
+                pthread_mutex_lock(&user_logged_in_mutex);
+                for (User * current_user = user_logged_in; current_user != NULL; current_user = current_user -> next) {
+                    if (strcmp(current_user -> username, source) == 0) {
+                        current_user -> in_session = 1;
+                        current_user -> session_joined = initiate_session(current_user -> session_joined, session_ID);
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&user_logged_in_mutex);
+
+                // Update Message Sent NS_ACK
+                message_sent.type = 9;
+                to_send = 1;
+                sprintf((char *) (message_sent.data), "%d", session_ID);
+
+                // Indicating Session Successfully Created And Joined
+                fprintf(stdout, "Server: User %s: Successfully Created Session %d\n", new_user -> username, session_ID);
+            } else {
+                message_sent.type = 9;
+                sprintf((char *) (message_sent.data), "%d", session_ID);
+                message_sent.size = strlen((char *) (message_sent.data));
+                strcpy((char *) (message_sent.source ), "Session Already Exist");
+                fprintf(stdout, "Server: User %s: Failed To Create Session %d, Reason, Session Already Exist\n", new_user -> username, session_ID);
+
+                memset(buffer, 0, BUFFER_SIZE);
+                serialization(&message_sent, buffer);
+                fprintf(stdout, "Server: Sending Message \"%s\" To User %s\n", buffer, new_user -> username);
+                buffer[strlen(buffer)] = '\0';
+                if ((bytes_sent = send(new_user -> socketFD, buffer, strlen(buffer) + 1, 0)) == -1) {
+                    fprintf(stderr, "Server: send Error\n");
                 }
             }
-            pthread_mutex_unlock(&user_logged_in_mutex);
-
-            // Update Message Sent NS_ACK
-            message_sent.type = 9;
-            to_send = 1;
-            sprintf((char *) (message_sent.data), "%d", session_ID);
-
-            // Indicating Session Successfully Created And Joined
-            fprintf(stdout, "Server: User %s: Successfully Created Session %d\n", new_user -> username, session_ID);
         // User Send Message
         } else if (message_received.type == 10) {
             fprintf(stdout, "Server: User %s: Sending Message \"%s\"\n", new_user -> username, message_received.data);
